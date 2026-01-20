@@ -225,6 +225,12 @@ namespace ONIAccessibilityMod
 
             KKeyCode keyCode = key_def.mKeyCode;
 
+            // Log all key presses when menu is active for debugging
+            if (VirtualNavigator.MenuActive)
+            {
+                Debug.Log("[A11Y] Key pressed: " + keyCode.ToString());
+            }
+
             // Only intercept navigation when menu is active
             if (!VirtualNavigator.MenuActive) return true;
 
