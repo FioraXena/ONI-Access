@@ -8,7 +8,7 @@ namespace ONIAccessibilityMod
 {
     //==========================================================================
     // ONI ACCESS - Phase 1: Main Menu
-    // Uses Harmony to intercept ONI's input system directly
+    // Arrow keys use Unity Input, Enter uses KInputController
     //==========================================================================
 
     // NVDA Bridge - speaks text via NVDA screen reader
@@ -24,20 +24,19 @@ namespace ONIAccessibilityMod
             try
             {
                 int result = nvdaController_speakText(text);
-                Debug.Log("[A11Y] NVDA returned: " + result);
                 if (result != 0)
                 {
-                    Debug.LogWarning("[A11Y] NVDA speak returned error code: " + result);
+                    Debug.LogWarning("[A11Y] NVDA returned error: " + result);
                 }
             }
             catch (System.Exception ex)
             {
-                Debug.LogWarning("[A11Y] NVDA speak exception: " + ex.Message);
+                Debug.LogWarning("[A11Y] NVDA exception: " + ex.Message);
             }
         }
     }
 
-    // State Engine - tracks current game state
+    // State Engine
     public enum GameState
     {
         None,
@@ -48,7 +47,7 @@ namespace ONIAccessibilityMod
         Paused
     }
 
-    // Virtual Menu Item with custom activation phrase
+    // Virtual Menu Item
     public class VirtualMenuItem
     {
         public string Name;
@@ -64,7 +63,7 @@ namespace ONIAccessibilityMod
     }
 
     //==========================================================================
-    // Virtual Navigator - handles all menu navigation
+    // Virtual Navigator
     //==========================================================================
     public static class VirtualNavigator
     {
@@ -73,19 +72,19 @@ namespace ONIAccessibilityMod
         public static int CurrentIndex = 0;
         public static bool MenuActive = false;
 
-        // Phase 1: Main Menu
         public static void ActivateMainMenu()
         {
             Debug.Log("[A11Y] Activating Main Menu navigation");
             CurrentState = GameState.MainMenu;
             CurrentMenu.Clear();
 
-            // Virtual menu items with natural activation phrases
+            // Menu items matching ONI's main menu
             CurrentMenu.Add(new VirtualMenuItem("Resume Game", "Resuming Game", () => ClickButton("ResumeGame")));
             CurrentMenu.Add(new VirtualMenuItem("New Game", "Starting New Game", () => ClickButton("NewGame")));
             CurrentMenu.Add(new VirtualMenuItem("Load Game", "Opening Load Game", () => ClickButton("LoadGame")));
-            CurrentMenu.Add(new VirtualMenuItem("Options", "Opening Options", () => ClickButton("Options")));
+            CurrentMenu.Add(new VirtualMenuItem("Colony Summaries", "Opening Colony Summaries", () => ClickButton("ColonySummaries")));
             CurrentMenu.Add(new VirtualMenuItem("Mods", "Opening Mods", () => ClickButton("Mods")));
+            CurrentMenu.Add(new VirtualMenuItem("Options", "Opening Options", () => ClickButton("Options")));
             CurrentMenu.Add(new VirtualMenuItem("Quit to Desktop", "Quitting Game", () => ClickButton("QuitToDesktop")));
 
             CurrentIndex = 0;
@@ -99,7 +98,7 @@ namespace ONIAccessibilityMod
         {
             if (!MenuActive || CurrentMenu.Count == 0) return;
             CurrentIndex = (CurrentIndex + 1) % CurrentMenu.Count;
-            Debug.Log("[A11Y] Navigate Down - Index: " + CurrentIndex + " of " + CurrentMenu.Count);
+            Debug.Log("[A11Y] Navigate Down - Index: " + CurrentIndex);
             AnnounceCurrentItem();
         }
 
@@ -107,7 +106,7 @@ namespace ONIAccessibilityMod
         {
             if (!MenuActive || CurrentMenu.Count == 0) return;
             CurrentIndex = (CurrentIndex - 1 + CurrentMenu.Count) % CurrentMenu.Count;
-            Debug.Log("[A11Y] Navigate Up - Index: " + CurrentIndex + " of " + CurrentMenu.Count);
+            Debug.Log("[A11Y] Navigate Up - Index: " + CurrentIndex);
             AnnounceCurrentItem();
         }
 
@@ -116,13 +115,8 @@ namespace ONIAccessibilityMod
             if (!MenuActive || CurrentIndex < 0 || CurrentIndex >= CurrentMenu.Count) return;
             var item = CurrentMenu[CurrentIndex];
             Debug.Log("[A11Y] Executing: " + item.Name);
-
-            // Use custom activation phrase
             NVDA.Speak(item.ActivationPhrase);
-
-            // Deactivate menu before executing to avoid interference
             MenuActive = false;
-
             if (item.Execute != null) item.Execute();
         }
 
@@ -130,9 +124,8 @@ namespace ONIAccessibilityMod
         {
             if (CurrentIndex >= 0 && CurrentIndex < CurrentMenu.Count)
             {
-                string announcement = CurrentMenu[CurrentIndex].Name;
-                Debug.Log("[A11Y] Announcing: " + announcement);
-                NVDA.Speak(announcement);
+                Debug.Log("[A11Y] Announcing: " + CurrentMenu[CurrentIndex].Name);
+                NVDA.Speak(CurrentMenu[CurrentIndex].Name);
             }
         }
 
@@ -154,7 +147,6 @@ namespace ONIAccessibilityMod
         {
             Debug.Log("[A11Y] Looking for button: " + buttonName);
 
-            // Try multiple naming conventions
             string[] namesToTry = new string[]
             {
                 buttonName,
@@ -171,7 +163,7 @@ namespace ONIAccessibilityMod
                 {
                     if (objName.Contains(nameToTry))
                     {
-                        Debug.Log("[A11Y] Found and clicking button: " + objName);
+                        Debug.Log("[A11Y] Found and clicking: " + objName);
                         btn.SignalClick(KKeyCode.Mouse0);
                         return;
                     }
@@ -179,15 +171,60 @@ namespace ONIAccessibilityMod
             }
 
             Debug.LogWarning("[A11Y] Button not found: " + buttonName);
+        }
+    }
 
-            // Log all available buttons for debugging
-            Debug.Log("[A11Y] Available buttons:");
-            foreach (var btn in Object.FindObjectsOfType<KButton>())
+    //==========================================================================
+    // Input Handler - MonoBehaviour for arrow keys (Unity Input)
+    // Arrow keys don't go through KInputController, so we use Update()
+    //==========================================================================
+    public class A11YInputHandler : MonoBehaviour
+    {
+        public static A11YInputHandler Instance;
+        private float lastInputTime = 0f;
+        private const float INPUT_DELAY = 0.2f;
+
+        void Awake()
+        {
+            if (Instance != null)
             {
-                if (btn != null)
-                {
-                    Debug.Log("[A11Y]   - " + btn.gameObject.name);
-                }
+                Destroy(gameObject);
+                return;
+            }
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+            Debug.Log("[A11Y] Input handler created");
+        }
+
+        void Update()
+        {
+            if (!VirtualNavigator.MenuActive) return;
+            if (Time.unscaledTime - lastInputTime < INPUT_DELAY) return;
+
+            if (Input.GetKeyDown(KeyCode.DownArrow))
+            {
+                Debug.Log("[A11Y] Unity Input: Down Arrow");
+                lastInputTime = Time.unscaledTime;
+                VirtualNavigator.NavigateDown();
+            }
+            else if (Input.GetKeyDown(KeyCode.UpArrow))
+            {
+                Debug.Log("[A11Y] Unity Input: Up Arrow");
+                lastInputTime = Time.unscaledTime;
+                VirtualNavigator.NavigateUp();
+            }
+            else if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            {
+                Debug.Log("[A11Y] Unity Input: Enter");
+                lastInputTime = Time.unscaledTime;
+                VirtualNavigator.ExecuteCurrent();
+            }
+            else if (Input.GetKeyDown(KeyCode.Backspace))
+            {
+                Debug.Log("[A11Y] Unity Input: Backspace");
+                lastInputTime = Time.unscaledTime;
+                VirtualNavigator.Deactivate();
+                NVDA.Speak("Menu closed");
             }
         }
     }
@@ -212,74 +249,23 @@ namespace ONIAccessibilityMod
     }
 
     //==========================================================================
-    // Input Interceptor - Harmony patch on KInputController
-    // This intercepts input BEFORE ONI processes it
-    //==========================================================================
-    [HarmonyPatch(typeof(KInputController), nameof(KInputController.QueueButtonEvent))]
-    public class InputInterceptorPatch
-    {
-        static bool Prefix(KInputController.KeyDef key_def, bool is_down)
-        {
-            // Only intercept key down events
-            if (!is_down) return true;
-
-            KKeyCode keyCode = key_def.mKeyCode;
-
-            // Log all key presses when menu is active for debugging
-            if (VirtualNavigator.MenuActive)
-            {
-                Debug.Log("[A11Y] Key pressed: " + keyCode.ToString());
-            }
-
-            // Only intercept navigation when menu is active
-            if (!VirtualNavigator.MenuActive) return true;
-
-            // Handle navigation keys
-            if (keyCode == KKeyCode.DownArrow)
-            {
-                Debug.Log("[A11Y] Intercepted: Down Arrow");
-                VirtualNavigator.NavigateDown();
-                return false; // Block game from processing
-            }
-            else if (keyCode == KKeyCode.UpArrow)
-            {
-                Debug.Log("[A11Y] Intercepted: Up Arrow");
-                VirtualNavigator.NavigateUp();
-                return false;
-            }
-            else if (keyCode == KKeyCode.Return || keyCode == KKeyCode.KeypadEnter)
-            {
-                Debug.Log("[A11Y] Intercepted: Enter");
-                VirtualNavigator.ExecuteCurrent();
-                return false;
-            }
-            else if (keyCode == KKeyCode.Backspace)
-            {
-                // Backspace goes back in menus
-                Debug.Log("[A11Y] Intercepted: Backspace");
-                VirtualNavigator.Deactivate();
-                NVDA.Speak("Menu closed");
-                return false;
-            }
-            // Note: Escape is NOT intercepted - it should open pause menu in-game
-
-            return true; // Let other keys pass through
-        }
-    }
-
-    //==========================================================================
-    // Main Menu Detection
+    // Main Menu Detection - creates input handler and activates menu
     //==========================================================================
     [HarmonyPatch(typeof(MainMenu), "OnSpawn")]
     public class MainMenuPatch
     {
         static void Postfix(MainMenu __instance)
         {
-            Debug.Log("[A11Y] ========================================");
             Debug.Log("[A11Y] MainMenu.OnSpawn detected!");
-            Debug.Log("[A11Y] ========================================");
 
-            // Small delay to let menu fully initialize
+            // Create input handler if needed
+            if (A11YInputHandler.Instance == null)
+            {
+                var go = new GameObject("A11YInputHandler");
+                go.AddComponent<A11YInputHandler>();
+                Debug.Log("[A11Y] Created input handler GameObject");
+            }
+
             __instance.StartCoroutine(ActivateAfterDelay());
         }
 
@@ -291,14 +277,14 @@ namespace ONIAccessibilityMod
     }
 
     //==========================================================================
-    // Game Load Complete Detection - announces when colony is loaded
+    // Game Load Complete Detection
     //==========================================================================
     [HarmonyPatch(typeof(Game), "OnSpawn")]
     public class GameSpawnPatch
     {
         static void Postfix()
         {
-            Debug.Log("[A11Y] Game.OnSpawn - Colony loaded");
+            Debug.Log("[A11Y] Colony loaded");
             VirtualNavigator.SetState(GameState.InGame);
             NVDA.Speak("Colony Loaded");
         }
