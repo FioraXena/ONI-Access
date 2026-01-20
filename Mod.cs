@@ -224,13 +224,15 @@ namespace ONIAccessibilityMod
                 VirtualNavigator.ExecuteCurrent();
                 return false;
             }
-            else if (keyCode == KKeyCode.Backspace || keyCode == KKeyCode.Escape)
+            else if (keyCode == KKeyCode.Backspace)
             {
-                Debug.Log("[A11Y] Intercepted: Back/Escape");
+                // Backspace goes back in menus
+                Debug.Log("[A11Y] Intercepted: Backspace");
                 VirtualNavigator.Deactivate();
                 NVDA.Speak("Menu closed");
                 return false;
             }
+            // Note: Escape is NOT intercepted - it should open pause menu in-game
 
             return true; // Let other keys pass through
         }
