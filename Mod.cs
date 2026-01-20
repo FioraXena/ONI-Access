@@ -23,11 +23,16 @@ namespace ONIAccessibilityMod
             Debug.Log("[A11Y] Speaking: " + text);
             try
             {
-                nvdaController_speakText(text);
+                int result = nvdaController_speakText(text);
+                Debug.Log("[A11Y] NVDA returned: " + result);
+                if (result != 0)
+                {
+                    Debug.LogWarning("[A11Y] NVDA speak returned error code: " + result);
+                }
             }
             catch (System.Exception ex)
             {
-                Debug.LogWarning("[A11Y] NVDA speak failed: " + ex.Message);
+                Debug.LogWarning("[A11Y] NVDA speak exception: " + ex.Message);
             }
         }
     }
