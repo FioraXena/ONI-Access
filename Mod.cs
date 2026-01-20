@@ -220,14 +220,6 @@ namespace ONIAccessibilityMod
 
             KKeyCode keyCode = key_def.mKeyCode;
 
-            // Handle Space during loading
-            if (VirtualNavigator.CurrentState == GameState.Loading && keyCode == KKeyCode.Space)
-            {
-                Debug.Log("[A11Y] Space pressed during loading");
-                NVDA.Speak("Still loading");
-                return false;
-            }
-
             // Only intercept navigation when menu is active
             if (!VirtualNavigator.MenuActive) return true;
 
@@ -288,21 +280,7 @@ namespace ONIAccessibilityMod
     }
 
     //==========================================================================
-    // Loading Screen Detection
-    //==========================================================================
-    [HarmonyPatch(typeof(LoadingOverlay), "OnSpawn")]
-    public class LoadingOverlayPatch
-    {
-        static void Postfix()
-        {
-            Debug.Log("[A11Y] Loading screen started");
-            VirtualNavigator.SetState(GameState.Loading);
-            NVDA.Speak("Loading");
-        }
-    }
-
-    //==========================================================================
-    // Game Load Complete Detection
+    // Game Load Complete Detection - announces when colony is loaded
     //==========================================================================
     [HarmonyPatch(typeof(Game), "OnSpawn")]
     public class GameSpawnPatch
