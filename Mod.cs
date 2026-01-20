@@ -7,7 +7,8 @@ using KMod;
 namespace ONIAccessibilityMod
 {
     //==========================================================================
-    // ONI ACCESS - Phase 1: Main Menu (Modular Approach)
+    // ONI ACCESS - Phase 1: Main Menu
+    // Uses Harmony to intercept ONI's input system directly
     //==========================================================================
 
     // NVDA Bridge - speaks text via NVDA screen reader
@@ -20,7 +21,14 @@ namespace ONIAccessibilityMod
         {
             if (string.IsNullOrEmpty(text)) return;
             Debug.Log("[A11Y] Speaking: " + text);
-            try { nvdaController_speakText(text); } catch { }
+            try
+            {
+                nvdaController_speakText(text);
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning("[A11Y] NVDA speak failed: " + ex.Message);
+            }
         }
     }
 
@@ -60,28 +68,30 @@ namespace ONIAccessibilityMod
         // Phase 1: Main Menu
         public static void ActivateMainMenu()
         {
+            Debug.Log("[A11Y] Activating Main Menu navigation");
             CurrentState = GameState.MainMenu;
             CurrentMenu.Clear();
 
-            // Virtual menu items with button mappings
-            CurrentMenu.Add(new VirtualMenuItem("Resume Game", () => ClickButton("Button_ResumeGame")));
-            CurrentMenu.Add(new VirtualMenuItem("New Game", () => ClickButton("Button_NewGame")));
-            CurrentMenu.Add(new VirtualMenuItem("Load Game", () => ClickButton("Button_LoadGame")));
-            CurrentMenu.Add(new VirtualMenuItem("Options", () => ClickButton("Button_Options")));
-            CurrentMenu.Add(new VirtualMenuItem("Mods", () => ClickButton("Button_Mods")));
-            CurrentMenu.Add(new VirtualMenuItem("Quit Game", () => ClickButton("Button_QuitGame")));
+            // Virtual menu items matching ONI's main menu buttons
+            CurrentMenu.Add(new VirtualMenuItem("Resume Game", () => ClickButton("ResumeGame")));
+            CurrentMenu.Add(new VirtualMenuItem("New Game", () => ClickButton("NewGame")));
+            CurrentMenu.Add(new VirtualMenuItem("Load Game", () => ClickButton("LoadGame")));
+            CurrentMenu.Add(new VirtualMenuItem("Options", () => ClickButton("Options")));
+            CurrentMenu.Add(new VirtualMenuItem("Mods", () => ClickButton("Mods")));
+            CurrentMenu.Add(new VirtualMenuItem("Quit to Desktop", () => ClickButton("QuitToDesktop")));
 
             CurrentIndex = 0;
             MenuActive = true;
 
-            NVDA.Speak("Main Menu");
-            AnnounceCurrentItem();
+            // Delay speech slightly to ensure game is ready
+            NVDA.Speak("Main Menu. " + CurrentMenu[CurrentIndex].Name);
         }
 
         public static void NavigateDown()
         {
             if (!MenuActive || CurrentMenu.Count == 0) return;
             CurrentIndex = (CurrentIndex + 1) % CurrentMenu.Count;
+            Debug.Log("[A11Y] Navigate Down - Index: " + CurrentIndex);
             AnnounceCurrentItem();
         }
 
@@ -89,6 +99,7 @@ namespace ONIAccessibilityMod
         {
             if (!MenuActive || CurrentMenu.Count == 0) return;
             CurrentIndex = (CurrentIndex - 1 + CurrentMenu.Count) % CurrentMenu.Count;
+            Debug.Log("[A11Y] Navigate Up - Index: " + CurrentIndex);
             AnnounceCurrentItem();
         }
 
@@ -97,6 +108,7 @@ namespace ONIAccessibilityMod
             if (!MenuActive || CurrentIndex < 0 || CurrentIndex >= CurrentMenu.Count) return;
             var item = CurrentMenu[CurrentIndex];
             Debug.Log("[A11Y] Executing: " + item.Name);
+            NVDA.Speak("Activating " + item.Name);
             if (item.Execute != null) item.Execute();
         }
 
@@ -104,12 +116,15 @@ namespace ONIAccessibilityMod
         {
             if (CurrentIndex >= 0 && CurrentIndex < CurrentMenu.Count)
             {
-                NVDA.Speak(CurrentMenu[CurrentIndex].Name);
+                string announcement = CurrentMenu[CurrentIndex].Name;
+                Debug.Log("[A11Y] Announcing: " + announcement);
+                NVDA.Speak(announcement);
             }
         }
 
         public static void Deactivate()
         {
+            Debug.Log("[A11Y] Deactivating menu");
             MenuActive = false;
             CurrentMenu.Clear();
             CurrentState = GameState.None;
@@ -117,122 +132,129 @@ namespace ONIAccessibilityMod
 
         public static void ClickButton(string buttonName)
         {
+            Debug.Log("[A11Y] Looking for button: " + buttonName);
+
+            // Try multiple naming conventions
+            string[] namesToTry = new string[]
+            {
+                buttonName,
+                "Button_" + buttonName,
+                buttonName + "Button"
+            };
+
             foreach (var btn in Object.FindObjectsOfType<KButton>())
             {
-                if (btn != null && btn.gameObject.name == buttonName)
+                if (btn == null) continue;
+                string objName = btn.gameObject.name;
+
+                foreach (string nameToTry in namesToTry)
                 {
-                    Debug.Log("[A11Y] Clicking: " + buttonName);
-                    btn.SignalClick(KKeyCode.Mouse0);
-                    return;
+                    if (objName.Contains(nameToTry))
+                    {
+                        Debug.Log("[A11Y] Found and clicking button: " + objName);
+                        btn.SignalClick(KKeyCode.Mouse0);
+                        return;
+                    }
                 }
             }
-            Debug.Log("[A11Y] Button not found: " + buttonName);
-        }
-    }
 
-    //==========================================================================
-    // Input Handler - captures keyboard input via Update loop
-    //==========================================================================
-    public class A11YInputHandler : MonoBehaviour
-    {
-        public static A11YInputHandler Instance;
-        private float lastInputTime = 0f;
-        private const float INPUT_DELAY = 0.15f; // Prevent rapid repeat
+            Debug.LogWarning("[A11Y] Button not found: " + buttonName);
 
-        void Awake()
-        {
-            Instance = this;
-            DontDestroyOnLoad(gameObject);
-            Debug.Log("[A11Y] Input handler created and marked persistent");
-        }
-
-        void Update()
-        {
-            // Log periodically to confirm Update is running
-            if (Time.frameCount % 300 == 0)
+            // Log all available buttons for debugging
+            Debug.Log("[A11Y] Available buttons:");
+            foreach (var btn in Object.FindObjectsOfType<KButton>())
             {
-                Debug.Log("[A11Y] Input handler Update running, MenuActive=" + VirtualNavigator.MenuActive);
-            }
-
-            if (!VirtualNavigator.MenuActive) return;
-
-            // Rate limit input
-            if (Time.time - lastInputTime < INPUT_DELAY) return;
-
-            if (Input.GetKeyDown(KeyCode.DownArrow))
-            {
-                Debug.Log("[A11Y] Down arrow pressed");
-                lastInputTime = Time.time;
-                VirtualNavigator.NavigateDown();
-            }
-            else if (Input.GetKeyDown(KeyCode.UpArrow))
-            {
-                Debug.Log("[A11Y] Up arrow pressed");
-                lastInputTime = Time.time;
-                VirtualNavigator.NavigateUp();
-            }
-            else if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
-            {
-                Debug.Log("[A11Y] Enter pressed");
-                lastInputTime = Time.time;
-                VirtualNavigator.ExecuteCurrent();
-            }
-            else if (Input.GetKeyDown(KeyCode.Backspace))
-            {
-                Debug.Log("[A11Y] Backspace pressed");
-                lastInputTime = Time.time;
-                VirtualNavigator.Deactivate();
-                NVDA.Speak("Menu closed");
+                if (btn != null)
+                {
+                    Debug.Log("[A11Y]   - " + btn.gameObject.name);
+                }
             }
         }
     }
 
     //==========================================================================
-    // Mod Entry Point - initializes Harmony patches
+    // Mod Entry Point
     //==========================================================================
     public class Mod : UserMod2
     {
-        private static bool patched = false;
+        public static Harmony HarmonyInstance;
 
         public override void OnLoad(Harmony harmony)
         {
             base.OnLoad(harmony);
-            ApplyPatches(harmony);
-        }
-
-        public static void ApplyPatches(Harmony harmony)
-        {
-            if (patched) return;
-            patched = true;
-            Debug.Log("[A11Y] ONI Access loading...");
+            HarmonyInstance = harmony;
+            Debug.Log("[A11Y] ========================================");
+            Debug.Log("[A11Y] ONI Access Mod Loading...");
+            Debug.Log("[A11Y] ========================================");
             harmony.PatchAll();
-            Debug.Log("[A11Y] Patches applied");
+            Debug.Log("[A11Y] All Harmony patches applied");
         }
     }
 
     //==========================================================================
-    // Harmony Patches
+    // Input Interceptor - Harmony patch on KInputController
+    // This intercepts input BEFORE ONI processes it
+    //==========================================================================
+    [HarmonyPatch(typeof(KInputController), nameof(KInputController.QueueButtonEvent))]
+    public class InputInterceptorPatch
+    {
+        static bool Prefix(KInputController.KeyDef key_def, bool is_down)
+        {
+            // Only intercept key down events when menu is active
+            if (!is_down || !VirtualNavigator.MenuActive) return true;
+
+            KKeyCode keyCode = key_def.mKeyCode;
+
+            // Handle navigation keys
+            if (keyCode == KKeyCode.DownArrow)
+            {
+                Debug.Log("[A11Y] Intercepted: Down Arrow");
+                VirtualNavigator.NavigateDown();
+                return false; // Block game from processing
+            }
+            else if (keyCode == KKeyCode.UpArrow)
+            {
+                Debug.Log("[A11Y] Intercepted: Up Arrow");
+                VirtualNavigator.NavigateUp();
+                return false;
+            }
+            else if (keyCode == KKeyCode.Return || keyCode == KKeyCode.KeypadEnter)
+            {
+                Debug.Log("[A11Y] Intercepted: Enter");
+                VirtualNavigator.ExecuteCurrent();
+                return false;
+            }
+            else if (keyCode == KKeyCode.Backspace || keyCode == KKeyCode.Escape)
+            {
+                Debug.Log("[A11Y] Intercepted: Back/Escape");
+                VirtualNavigator.Deactivate();
+                NVDA.Speak("Menu closed");
+                return false;
+            }
+
+            return true; // Let other keys pass through
+        }
+    }
+
+    //==========================================================================
+    // Main Menu Detection
     //==========================================================================
     [HarmonyPatch(typeof(MainMenu), "OnSpawn")]
     public class MainMenuPatch
     {
-        static void Postfix()
+        static void Postfix(MainMenu __instance)
         {
-            Debug.Log("[A11Y] MainMenu detected - creating input handler");
+            Debug.Log("[A11Y] ========================================");
+            Debug.Log("[A11Y] MainMenu.OnSpawn detected!");
+            Debug.Log("[A11Y] ========================================");
 
-            // Create input handler if needed
-            if (A11YInputHandler.Instance == null)
-            {
-                var go = new GameObject("A11YInput");
-                go.AddComponent<A11YInputHandler>();
-                Debug.Log("[A11Y] Input handler GameObject created");
-            }
-            else
-            {
-                Debug.Log("[A11Y] Input handler already exists");
-            }
+            // Small delay to let menu fully initialize
+            __instance.StartCoroutine(ActivateAfterDelay());
+        }
 
-            // Activate virtual main menu
+        static System.Collections.IEnumerator ActivateAfterDelay()
+        {
+            yield return new WaitForSeconds(0.5f);
             VirtualNavigator.ActivateMainMenu();
         }
     }
