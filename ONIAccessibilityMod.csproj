@@ -1,0 +1,75 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>ONIAccessibilityMod</AssemblyName>
+    <RootNamespace>ONIAccessibilityMod</RootNamespace>
+    <LangVersion>9.0</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <OutputPath>bin\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <ONIDirectory>C:\Program Files (x86)\Steam\steamapps\common\OxygenNotIncluded</ONIDirectory>
+    <ONIManagedDirectory>$(ONIDirectory)\OxygenNotIncluded_Data\Managed</ONIManagedDirectory>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="UnityEngine">
+      <HintPath>$(ONIManagedDirectory)\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(ONIManagedDirectory)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(ONIManagedDirectory)\UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>$(ONIManagedDirectory)\UnityEngine.UIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(ONIManagedDirectory)\UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(ONIManagedDirectory)\UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>$(ONIManagedDirectory)\UnityEngine.TextRenderingModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>$(ONIManagedDirectory)\Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(ONIManagedDirectory)\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Assembly-CSharp-firstpass">
+      <HintPath>$(ONIManagedDirectory)\Assembly-CSharp-firstpass.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>$(ONIManagedDirectory)\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="CopyToModFolder" AfterTargets="Build">
+    <PropertyGroup>
+      <ModFolder>$(USERPROFILE)\Documents\Klei\OxygenNotIncluded\mods\Local\ONIAccessibilityMod</ModFolder>
+    </PropertyGroup>
+    <MakeDir Directories="$(ModFolder)" />
+    <Copy SourceFiles="$(OutputPath)ONIAccessibilityMod.dll" DestinationFolder="$(ModFolder)" />
+    <Copy SourceFiles="mod_info.yaml" DestinationFolder="$(ModFolder)" />
+    <Copy SourceFiles="mod.yaml" DestinationFolder="$(ModFolder)" />
+  </Target>
+
+</Project>

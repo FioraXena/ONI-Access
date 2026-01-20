@@ -1,0 +1,22 @@
+# Build results
+bin/
+obj/
+*.dll
+*.pdb
+*.exe
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Rider
+.idea/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Backup files
+*~
+*.bak
