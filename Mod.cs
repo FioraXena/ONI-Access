@@ -79,7 +79,11 @@ namespace ONIAccessibilityMod
             CurrentMenu.Clear();
 
             CurrentMenu.Add(new VirtualMenuItem("Resume Game", "Resuming Game", () => ClickButton("ResumeGame")));
-            CurrentMenu.Add(new VirtualMenuItem("New Game", "Starting New Game", () => ClickButton("NewGame")));
+            CurrentMenu.Add(new VirtualMenuItem("New Game", "Starting New Game", () => {
+                ClickButton("NewGame");
+                if (A11YInputHandler.Instance != null)
+                    A11YInputHandler.Instance.StartCoroutine(VirtualNavigator.ActivateNewGameAfterDelay());
+            }));
             CurrentMenu.Add(new VirtualMenuItem("Load Game", "Opening Load Game", () => ClickButton("LoadGame")));
             CurrentMenu.Add(new VirtualMenuItem("Colony Summaries", "Opening Colony Summaries", () => ClickButton("ColonySummaries")));
             CurrentMenu.Add(new VirtualMenuItem("Supply Closet", "Opening Supply Closet", () => ClickButton("SupplyCloset")));
@@ -181,6 +185,12 @@ namespace ONIAccessibilityMod
         {
             CurrentState = state;
             Debug.Log("[A11Y] State: " + state);
+        }
+
+        public static System.Collections.IEnumerator ActivateNewGameAfterDelay()
+        {
+            yield return new WaitForSeconds(0.8f);
+            ActivateNewGameMenu();
         }
 
         public static void ClickButton(string buttonName)
@@ -350,28 +360,6 @@ namespace ONIAccessibilityMod
         }
     }
 
-    //==========================================================================
-    // New Game Screen Detection
-    //==========================================================================
-    [HarmonyPatch(typeof(NewGameFlow), "OnSpawn")]
-    public class NewGameFlowPatch
-    {
-        static void Postfix()
-        {
-            Debug.Log("[A11Y] NewGameFlow detected");
-            // Delay to let UI initialize
-            if (A11YInputHandler.Instance != null)
-            {
-                A11YInputHandler.Instance.StartCoroutine(ActivateNewGameAfterDelay());
-            }
-        }
-
-        static System.Collections.IEnumerator ActivateNewGameAfterDelay()
-        {
-            yield return new WaitForSeconds(0.5f);
-            VirtualNavigator.ActivateNewGameMenu();
-        }
-    }
 
     //==========================================================================
     // Game Load Complete
